@@ -11,8 +11,9 @@
     curl -LsSf https://astral.sh/uv/install.sh | sh      # then reopen the terminal
     uv venv --python 3.9 ~/ryuenv
     source ~/ryuenv/bin/activate
-    uv pip install "setuptools<66" wheel
-    uv pip install ryu eventlet==0.30.2
+    uv pip install "setuptools<66" wheel pbr
+    uv pip install --no-build-isolation ryu eventlet==0.30.2
+    ryu-manager --version          # should print: ryu-manager 4.34
 
 ## Every time (4 terminals)
     # Terminal 1 - controller
