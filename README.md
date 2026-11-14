@@ -7,7 +7,7 @@ rate-limiting meters on virtual switches (Mininet + Open vSwitch). Reservations 
 automatically, link utilization is tracked, and hosts inside the network can exchange messages
 and data over TCP sockets, optionally on a reserved path.
 
-Team: _add names here_  |  Course: _add course and section here_
+Team: Shivanshi, Rohan, Shekhar  |  Course: Computer Networks
 
 ## Contents
 1. [Architecture](#architecture)
