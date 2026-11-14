@@ -48,3 +48,15 @@ The reservation server (Terminal 3) must be running for `--reserve`.
 Options: `--reserve MBPS` asks the reservation server first and only sends if ACCEPTED,
 `--secs N` sets the duration, `--keep` keeps the reservation after the transfer
 (by default it is cancelled when the transfer ends).
+
+## Sending a typed message from the client (host to host)
+With the network started with `--server-link`, type this in the reservation CLIENT (terminal 4):
+
+    MSG h1 h3 hello from the client
+
+The server asks host h1's message agent to send the text, and h1 delivers it to h3 across the
+network (h1 -> s1 -> s2 -> h3). Check the receiving host's inbox at the `mininet>` prompt:
+
+    sh cat /tmp/h3_inbox.txt
+
+Restart Mininet after updating the code (the agents on the hosts start with the network).

@@ -23,8 +23,12 @@ keep it). Destinations can be host names (h1..h4) or IP addresses.
 
 Message format between hosts (application layer, one TCP connection per message):
     sender   ->  "SEND MSG <n>\n" + n bytes of text        or
-                 "SEND BULK <n>\n" + n bytes of data
+                 "SEND BULK <n>\n" + n bytes of data       or
+                 "SEND RELAY <n>\n" + "<dst> <text>"
     receiver ->  "OK <n> <seconds>\n"
+
+RELAY is how the reservation server's MSG command works: the server asks the
+SOURCE host to send a message, and that host sends it to the destination host.
 """
 
 import argparse
@@ -51,6 +55,15 @@ def resolve(destination):
 
 def log(text):
     print(f"[{time.strftime('%H:%M:%S')}] {text}", flush=True)
+
+
+def deliver_text(dst_ip, port, text):
+    """Send one text message to a host and return the receiver's reply line."""
+    data = text.encode("utf-8")
+    with socket.create_connection((dst_ip, port), timeout=10) as sock:
+        sock.settimeout(30)
+        sock.sendall(f"SEND MSG {len(data)}\n".encode() + data)
+        return sock.makefile("r").readline().strip()
 
 
 # ---------------------------------------------------------------------------
@@ -81,6 +94,20 @@ def handle_incoming(conn, addr):
             seconds = max(time.time() - started, 1e-6)
             log(f"bulk data from {sender} ({addr[0]}): {got / 1e6:.2f} MB "
                 f"in {seconds:.2f} s = {got * 8 / 1e6 / seconds:.2f} Mbit/s")
+        elif kind == "RELAY":
+            # "Please send this text to <target> for me" (asked by the reservation server)
+            request = reader.read(size).decode("utf-8", "replace")
+            target, _, text = request.partition(" ")
+            log(f"asked by {sender} to send \"{text}\" to {target}")
+            if not text or (target not in HOST_IPS and target.count(".") != 3):
+                conn.sendall(b"ERR bad relay request\n")
+                return
+            try:
+                inner = deliver_text(resolve(target), PORT, text)
+                conn.sendall(f"OK relayed to {target} (receiver replied: {inner})\n".encode())
+            except OSError as e:
+                conn.sendall(f"ERR could not reach {target}: {e}\n".encode())
+            return
         else:
             conn.sendall(b"ERR unknown kind\n")
             return

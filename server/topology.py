@@ -23,6 +23,10 @@ LINKS = {
 }
 
 
+# IP address of each host inside Mininet (used by the MSG command to reach a host)
+HOST_IPS = {"h1": "10.0.0.1", "h2": "10.0.0.2", "h3": "10.0.0.3", "h4": "10.0.0.4"}
+
+
 def link_key(a, b):
     """A link is the same whether we write (s1, s2) or (s2, s1).
     Sorting the two names gives every link ONE canonical name."""

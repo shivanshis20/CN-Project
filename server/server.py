@@ -20,6 +20,7 @@ Protocol (one line per message):
   CANCEL <id>                            OK cancelled id=<n> | ERROR <reason>
   STATUS                                 one line per active reservation, then END
   UTILIZATION                            one line per link, then END
+  MSG <src> <dst> <text...>              DELIVERED ... | ERROR <reason>   (src host sends the text to dst)
   QUIT                                   BYE
 """
 
@@ -31,12 +32,14 @@ import threading
 import time
 
 import controller_client
-from topology import CAPACITY, HOSTS, find_path, path_links
+from topology import CAPACITY, HOSTS, HOST_IPS, find_path, path_links
 
 HOST = "0.0.0.0"
 PORT = 5000
 LOG_FILE = "reservations_log.csv"
 UTIL_LOG_FILE = "utilization_log.csv"
+AGENT_PORT = 6000            # the message agent (host_messenger.py) listening inside every host
+MAX_MESSAGE_CHARS = 500
 
 REAPER_INTERVAL = 1.0        # how often (seconds) we look for expired reservations
 SAMPLE_INTERVAL = float(os.environ.get("SAMPLE_INTERVAL", "5"))   # utilization sampling
@@ -217,6 +220,36 @@ def handle_utilization():
     return "\n".join(lines)
 
 
+def handle_msg(line):
+    """MSG <src> <dst> <text...>: ask host <src> to send <text> to host <dst>.
+    The server cannot send as h1 itself (h1 lives inside Mininet), so it asks the
+    message agent running on h1, which then sends the message across the network."""
+    parts = line.split(None, 3)
+    if len(parts) < 4:
+        return "ERROR usage: MSG <src> <dst> <text>"
+    _, src, dst, text = parts
+    if src not in HOST_IPS or dst not in HOST_IPS:
+        return f"ERROR unknown host (valid hosts: {' '.join(HOSTS)})"
+    if src == dst:
+        return "ERROR source and destination are the same"
+    if len(text) > MAX_MESSAGE_CHARS:
+        return f"ERROR message too long (max {MAX_MESSAGE_CHARS} characters)"
+
+    payload = f"{dst} {text}".encode("utf-8")
+    try:
+        with socket.create_connection((HOST_IPS[src], AGENT_PORT), timeout=5) as agent:
+            agent.settimeout(15)
+            agent.sendall(f"SEND RELAY {len(payload)}\n".encode() + payload)
+            reply = agent.makefile("r").readline().strip()
+    except OSError as e:
+        return (f"ERROR could not reach host {src} ({HOST_IPS[src]}): {e} "
+                f"(is Mininet running with --server-link?)")
+
+    if reply.startswith("OK"):
+        return f"DELIVERED {src}->{dst} path={'->'.join(find_path(src, dst))} {reply}"
+    return f"ERROR {reply}"
+
+
 # ---------------------------------------------------------------------------
 # Background threads
 # ---------------------------------------------------------------------------
@@ -273,6 +306,8 @@ def handle_client(conn, addr):
                 reply = handle_status()
             elif command == "UTILIZATION":
                 reply = handle_utilization()
+            elif command == "MSG":
+                reply = handle_msg(line)
             elif command == "QUIT":
                 conn.sendall(b"BYE\n")
                 break

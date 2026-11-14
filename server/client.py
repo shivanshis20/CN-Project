@@ -5,6 +5,7 @@ Type commands at the prompt, for example:
   RESERVE h1 h2 5 60      (reserve 5 Mbps from h1 to h2 for 60 seconds)
   STATUS
   UTILIZATION
+  MSG h1 h3 hello from the client   (host h1 sends this text to host h3)
   CANCEL 1
   QUIT
 
